@@ -14,6 +14,10 @@ const formatter = new Intl.NumberFormat("zh-TW");
 
 let kind = "oop";
 let entityCount = Number(countInput.value);
+let substeps = 1;
+let stressWorker = null;
+let stressRows = [];
+let wasPlayingBeforeStress = false;
 let world = makeWorld(kind, makeSeed(entityCount));
 let playing = true;
 let benchmarking = false;
@@ -48,6 +52,7 @@ function rebuild() {
   tickMsAverage = 0;
   $("entity-live").innerHTML = formatter.format(entityCount) + " <small>ENTITIES</small>";
   $("draw-live").innerHTML = formatter.format(shownCount()) + " <small>DOTS</small>";
+  updateWorkLabel();
   $("hit-live").innerHTML = "0 <small>HITS</small>";
   $("game-message").textContent = "拖曳 / 觸控 / WASD 移動玩家";
   modeInfo.textContent = ENGINE_INFO[kind].detail;
@@ -70,6 +75,14 @@ document.querySelectorAll(".mode").forEach(button =>
 
 countInput.addEventListener("input", () => {
   countLabel.textContent = formatter.format(Number(countInput.value));
+});
+function updateWorkLabel() {
+  $("work-label").textContent = "每幀約 " + formatter.format(entityCount * substeps) + " 次實體更新";
+}
+$("substeps").addEventListener("change", (event) => {
+  if (benchmarking) return;
+  substeps = Number(event.target.value);
+  updateWorkLabel();
 });
 countInput.addEventListener("change", () => {
   if (benchmarking) return;
@@ -204,7 +217,7 @@ function frame(now) {
   if (playing) {
     movePlayer(dt);
     const start = performance.now();
-    world.update(player.x, player.y);
+    for (let i = 0; i < substeps; i++) world.update(player.x, player.y);
     const elapsed = performance.now() - start;
     tickMsAverage = tickMsAverage ? tickMsAverage * .88 + elapsed * .12 : elapsed;
     fpsAverage = fpsAverage * .88 + (1 / Math.max(dt, .001)) * .12;
@@ -280,3 +293,115 @@ benchButton.addEventListener("click", async () => {
 rebuild();
 draw(0, false);
 requestAnimationFrame(frame);
+
+// Auto-escalation deliberately happens in a dedicated Web Worker.
+// The main thread stays responsive, and FPS never masquerades as a CPU benchmark.
+function setStressControls(disabled) {
+  benchButton.disabled = disabled;
+  pauseButton.disabled = disabled;
+  resetButton.disabled = disabled;
+  countInput.disabled = disabled;
+  $("substeps").disabled = disabled;
+  document.querySelectorAll(".mode").forEach(button => button.disabled = disabled);
+}
+
+function stopStress(cancelled = false) {
+  stressWorker?.terminate();
+  stressWorker = null;
+  benchmarking = false;
+  setStressControls(false);
+  $("stress-button").disabled = false;
+  $("stress-stop").hidden = true;
+  if (wasPlayingBeforeStress && !playing) pauseButton.click();
+  lastFrameAt = 0;
+  if (cancelled) $("stress-progress").textContent = "已停止，可重新測試";
+}
+
+function renderStress(rows, finished) {
+  const host = $("stress-results");
+  const budget = 1000 / 60;
+  const tags = { oop: "OOP", ecs: "ECS", dod: "DOD" };
+  const table = document.createElement("table");
+  table.className = "stress-table";
+  const heading = document.createElement("thead");
+  heading.innerHTML = "<tr><th>工作負載（隻 × 次）</th><th>OOP</th><th>ECS</th><th>DOD</th></tr>";
+  table.append(heading);
+  const body = document.createElement("tbody");
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    const label = document.createElement("td");
+    label.textContent = formatter.format(row.count) + " × " + row.substeps;
+    tr.append(label);
+    for (const kind of ["oop", "ecs", "dod"]) {
+      const value = row.ms[kind];
+      const td = document.createElement("td");
+      td.className = value > budget ? "stress-over" : "stress-under";
+      td.textContent = value.toFixed(2) + " ms " + (value > budget ? "▲" : "✓");
+      td.title = tags[kind] + (value > budget ? " 超過" : " 尚未超過") + " 16.67ms 單執行緒預算";
+      tr.append(td);
+    }
+    body.append(tr);
+  }
+  table.append(body);
+  host.replaceChildren(table);
+  const text = document.createElement("p");
+  text.className = "stress-caption";
+  if (finished) {
+    const stageFor = (kind) => rows.find(row => row.ms[kind] > budget);
+    const found = ["oop", "ecs", "dod"].map(kind =>
+      tags[kind] + "：" +
+      (stageFor(kind) ? formatter.format(stageFor(kind).work) + " 更新/幀" : "測試上限內未超標")
+    );
+    text.textContent = "首次超過 16.67 ms 的工作量｜" + found.join("；") +
+      "。這是 CPU 單執行緒模擬成本門檻，不是實際 FPS。";
+  } else {
+    text.textContent = "正在加壓：紅色表示該架構耗盡單幀 16.67 ms 的理論模擬預算。";
+  }
+  host.append(text);
+}
+
+$("stress-button").addEventListener("click", () => {
+  if (benchmarking) return;
+  if (typeof Worker === "undefined") {
+    $("stress-progress").textContent = "這個瀏覽器不支援 Web Worker。";
+    return;
+  }
+  benchmarking = true;
+  wasPlayingBeforeStress = playing;
+  if (playing) pauseButton.click();
+  setStressControls(true);
+  stressRows = [];
+  $("stress-button").disabled = true;
+  $("stress-stop").hidden = false;
+  $("stress-progress").textContent = "正在初始化測試…";
+  $("stress-results").innerHTML = '<p class="stress-placeholder">獨立運算執行緒測試中。可以隨時按「停止測試」。</p>';
+  try {
+    stressWorker = new Worker("./src/stress-worker.js", { type: "module" });
+    stressWorker.onmessage = ({ data }) => {
+      if (data.type === "stage") {
+        stressRows.push(data.result);
+        renderStress(stressRows, false);
+        $("stress-progress").textContent = "已測 " + data.index + "/" + data.total + " 級";
+      } else if (data.type === "done") {
+        renderStress(stressRows, true);
+        $("stress-progress").textContent = "完成，共 " + stressRows.length + " 級";
+        stopStress(false);
+      } else if (data.type === "error") {
+        $("stress-progress").textContent = "測試失敗：" + data.message;
+        stopStress(false);
+      }
+    };
+    stressWorker.onerror = () => {
+      $("stress-progress").textContent = "Worker 測試發生錯誤，請檢查瀏覽器 Console。";
+      stopStress(false);
+    };
+    stressWorker.postMessage({ type: "start" });
+  } catch (error) {
+    $("stress-progress").textContent = "無法啟動測試：" + String(error);
+    stopStress(false);
+  }
+});
+
+$("stress-stop").addEventListener("click", () => {
+  if (stressWorker) stopStress(true);
+});
