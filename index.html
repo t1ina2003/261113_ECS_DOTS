@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#09101f" />
+  <meta name="description" content="ECS / DOTS 互動實驗室：玩群體追逐遊戲，親自比較 OOP、ECS、資料導向更新效能。">
+  <title>Swarm Lab — ECS / DOTS 效能互動實驗室</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Swarm Lab 首頁"><span class="brand-icon">S<span class="brand-dot">.</span></span><span>SWARM<span class="brand-sub">LAB</span></span></a>
+      <span class="top-tag"><span class="online-dot"></span>INTERACTIVE SYSTEMS DEMO</span>
+      <a class="github-link" href="https://github.com/t1ina2003/261113_ECS_DOTS" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a>
+    </header>
+
+    <section class="hero">
+      <div class="eyebrow">ENGINEERING PLAYGROUND <span class="eyebrow-line"></span> 001 / DATA-ORIENTED DESIGN</div>
+      <h1>10,000 隻敵人，<br><em>你的程式撐得住嗎？</em></h1>
+      <p class="lead">用一個真的能玩的追逐小遊戲，切換 <strong>OOP、ECS、DOD</strong> 三種資料架構。拖動藍色玩家躲避敵人，增加敵人數量，觀察運算瓶頸從哪裡開始出現。</p>
+      <div class="hero-notes"><span><i class="note-dot cyan"></i> 同一運算公式</span><span><i class="note-dot violet"></i> 真實瀏覽器計時</span><span><i class="note-dot amber"></i> 手機也能玩</span></div>
+    </section>
+
+    <main>
+      <section class="workspace" aria-label="互動遊戲與效能測試">
+        <div class="arena-card">
+          <div class="card-head">
+            <div><span class="micro-label">01 / LIVE SIMULATION</span><h2>群體追逐競技場</h2></div>
+            <span class="running-status" id="running-status"><span class="pulse-dot"></span> RUNNING</span>
+          </div>
+          <div class="canvas-wrap" id="canvas-wrap">
+            <canvas id="arena" width="1000" height="620" aria-label="追逐遊戲畫面，滑動或拖曳來移動玩家"></canvas>
+            <div class="canvas-top"><span>WORLD 1000 × 620</span><span id="visible-label">RENDER SAMPLE ≤ 700</span></div>
+            <div class="canvas-bottom"><span id="game-message">拖曳 / 觸控 / WASD 移動玩家</span><span id="survival">生存 0.0s</span></div>
+          </div>
+          <div class="arena-bottom">
+            <div><span class="mini-label">SIMULATION</span><strong id="entity-live">6,000 <small>ENTITIES</small></strong></div>
+            <div><span class="mini-label">DRAW CALLS</span><strong id="draw-live">700 <small>DOTS</small></strong></div>
+            <div><span class="mini-label">受到碰撞</span><strong id="hit-live">0 <small>HITS</small></strong></div>
+            <button class="button button-secondary" id="pause-button" type="button">暫停</button>
+          </div>
+        </div>
+
+        <aside class="panel">
+          <div class="card-head"><div><span class="micro-label">02 / CONTROL ROOM</span><h2>模擬控制台</h2></div></div>
+          <label class="field-label" for="count">敵人數量 <output id="count-value" for="count">6,000</output></label>
+          <input id="count" type="range" min="500" max="30000" step="500" value="6000" />
+          <div class="range-ends"><span>500 · 輕量</span><span>30,000 · 壓力測試</span></div>
+
+          <div class="field-label selection-label">運算架構 <span>點選切換</span></div>
+          <div class="mode-list" role="group" aria-label="選擇運算架構">
+            <button class="mode selected" data-mode="oop" aria-pressed="true" type="button"><span class="mode-symbol oop-symbol">O</span><span class="mode-name">OOP 傳統物件<small>Object-oriented</small></span><span class="mode-check">✓</span></button>
+            <button class="mode" data-mode="ecs" aria-pressed="false" type="button"><span class="mode-symbol ecs-symbol">E</span><span class="mode-name">ECS 組件系統<small>Entity · Component · System</small></span><span class="mode-check">✓</span></button>
+            <button class="mode" data-mode="dod" aria-pressed="false" type="button"><span class="mode-symbol dod-symbol">D</span><span class="mode-name">DOD / DOTS 風格<small>Typed arrays · Data-oriented</small></span><span class="mode-check">✓</span></button>
+          </div>
+          <div class="mode-info" id="mode-info">每一隻敵人都是有 update() 方法的物件；很好理解，但大量資料可能需要較多間接存取。</div>
+
+          <div class="metrics-title"><span class="micro-label">03 / LIVE TELEMETRY</span><span>每秒刷新</span></div>
+          <div class="metrics">
+            <div class="metric"><span>邏輯更新耗時</span><strong id="update-ms">—</strong><small>ms / frame · 不含繪圖</small></div>
+            <div class="metric"><span>畫面更新率</span><strong id="fps">—</strong><small>FPS · 含繪圖與瀏覽器排程</small></div>
+          </div>
+          <div class="button-row">
+            <button class="button button-primary" id="benchmark-button" type="button">執行公平跑分 ↗</button>
+            <button class="button button-secondary" id="reset-button" type="button">重置</button>
+          </div>
+          <p class="panel-hint">切換模式會以相同種子重建敵人。跑分不包含畫面繪製，才能比較純粹的資料運算。</p>
+        </aside>
+      </section>
+
+      <section class="benchmark-card" id="benchmark-section" aria-label="跑分結果">
+        <div class="section-head"><div><span class="micro-label">04 / HEADLESS BENCHMARK</span><h2>同樣工作，誰算得快？</h2></div><span class="benchmark-badge">實測 · 非預設數據</span></div>
+        <p class="section-desc">三種架構使用相同的初始資料、相同的玩家移動軌跡、相同的運算公式；每組先預熱 40 回合，再取 100 回合平均。<strong>不繪圖、不算初始化時間</strong>，降低比較偏差。</p>
+        <div class="bench-results" id="bench-results">
+          <div class="empty-bench"><span class="empty-symbol">↗</span><div>尚未執行跑分</div><small>按上方「執行公平跑分」，直接測出你這台裝置的結果。</small></div>
+        </div>
+        <p class="bench-disclaimer">結果因裝置、JIT 最佳化、GC、瀏覽器負載不同而浮動；差距很小時請多跑幾次。這個測試只測 CPU 更新，不代表完整遊戲的整體效能。</p>
+      </section>
+
+      <section class="learn" id="learn">
+        <div class="section-head"><div><span class="micro-label">05 / THE REAL LESSON</span><h2>到底哪裡需要 ECS / DOTS？</h2></div></div>
+        <div class="learn-grid">
+          <article class="learn-card"><span class="learn-num">01 / OOP</span><h3>幾十隻敵人？<br>傳統 OOP 就夠了。</h3><p>每隻敵人都是物件，狀態與行為寫在一起，直覺、容易除錯。少量資料時，額外拆成 ECS 並不一定值得。</p><code>enemy.update(player)</code></article>
+          <article class="learn-card"><span class="learn-num">02 / ECS</span><h3>敵人有不同能力？<br>ECS 幫你拆解組合。</h3><p>Position、Velocity、Health、AI 可以獨立組合。只有需要移動的 Entity 才交給 MovementSystem，容易擴充功能，但不是效能保證。</p><code>MovementSystem(Position, Velocity)</code></article>
+          <article class="learn-card featured"><span class="learn-num">03 / DOD · DOTS-LIKE</span><h3>數萬隻同時更新？<br>讓資料連續排列。</h3><p>只讀取要運算的欄位，用 TypedArray 讓資料存取更規律，減少每個物件的記憶體管理成本；這時可能產生可測量的優勢。</p><code>Float32Array → tight update loop</code></article>
+        </div>
+        <div class="projection">
+          <div><span class="micro-label">06 / DATA → VIEW</span><h3>「畫面只是資料的投影」</h3><p>玩家位置、敵人位置都在模擬引擎中。Canvas 只從資料讀出部分敵人來畫圖。即使畫面只畫 700 隻，系統仍然會對你設定的全部敵人做運算。<strong>遊戲邏輯與視覺負擔被刻意分離</strong>，這就是這句話最實際的意思。</p></div>
+          <div class="projection-diagram"><div class="diagram-node">ENTITIES <span>完整 N 隻</span></div><div class="diagram-arrow">↓</div><div class="diagram-node middle">SYSTEM <span>更新 N 隻</span></div><div class="diagram-arrow">↓</div><div class="diagram-node accent">CANVAS VIEW <span>只畫最多 700 隻</span></div></div>
+        </div>
+        <p class="honest-note"><strong>重要觀念：</strong>沒有哪個規模「必須」使用 ECS 或 DOTS。當效能分析顯示模擬資料存取才是瓶頸、資料量很大又需要同類批次運算，才值得嘗試資料導向。此網站的「DOTS 風格」是 JavaScript 的 SoA / TypedArray 範例，<strong>並沒有使用 Unity 的 ECS、Burst 或 Jobs</strong>。</p>
+      </section>
+    </main>
+    <footer><span>SWARM LAB / ECS & DATA-ORIENTED DESIGN</span><span>Designed to measure, not to assume.</span></footer>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

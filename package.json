@@ -1,0 +1,9 @@
+{
+  "name": "ecs-dots-swarm-lab",
+  "private": true,
+  "type": "module",
+  "description": "Zero-dependency browser demo of OOP, ECS and data-oriented simulation.",
+  "scripts": {
+    "test": "node --test"
+  }
+}
