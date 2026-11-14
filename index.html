@@ -46,8 +46,20 @@
         <aside class="panel">
           <div class="card-head"><div><span class="micro-label">02 / CONTROL ROOM</span><h2>模擬控制台</h2></div></div>
           <label class="field-label" for="count">敵人數量 <output id="count-value" for="count">6,000</output></label>
-          <input id="count" type="range" min="500" max="30000" step="500" value="6000" />
-          <div class="range-ends"><span>500 · 輕量</span><span>30,000 · 壓力測試</span></div>
+          <input id="count" type="range" min="500" max="250000" step="500" value="6000" />
+          <div class="range-ends"><span>500 · 輕量</span><span>250,000 · 壓力測試</span></div>
+
+
+          <div class="substep-control">
+            <label for="substeps" class="field-label">每幀模擬次數 <span class="substep-tip">增加真實計算負載</span></label>
+            <select id="substeps" aria-label="每幀模擬次數">
+              <option value="1">1× — 標準</option>
+              <option value="2">2× — 雙倍物理運算</option>
+              <option value="4">4× — 高精度模擬</option>
+              <option value="8">8× — 極限模式</option>
+            </select>
+            <p id="work-label" class="work-label">每幀約 6,000 次實體更新</p>
+          </div>
 
           <div class="field-label selection-label">運算架構 <span>點選切換</span></div>
           <div class="mode-list" role="group" aria-label="選擇運算架構">
@@ -75,6 +87,21 @@
         <p class="section-desc">三種架構使用相同的初始資料、相同的玩家移動軌跡、相同的運算公式；每組先預熱 40 回合，再取 100 回合平均。<strong>不繪圖、不算初始化時間</strong>，降低比較偏差。</p>
         <div class="bench-results" id="bench-results">
           <div class="empty-bench"><span class="empty-symbol">↗</span><div>尚未執行跑分</div><small>按上方「執行公平跑分」，直接測出你這台裝置的結果。</small></div>
+        </div>
+
+        <div class="stress-lab" id="stress-lab">
+          <div class="stress-intro">
+            <div><span class="micro-label">AUTO STRESS TEST / CPU BUDGET</span><h3>電腦太快？自動找出瓶頸</h3></div>
+            <span class="threshold-pill">60 FPS = 每幀 16.67 ms</span>
+          </div>
+          <p class="section-desc">自動從 5,000 隻增加到 250,000 隻，再逐步提升每幀的物理更新次數（最多 32 次、800 萬次實體更新）。三種架構逐級計時；當三者都超過單執行緒 60 FPS 的理論運算預算，就停止加壓。</p>
+          <div class="stress-actions">
+            <button class="button button-primary" id="stress-button" type="button">自動尋找運算瓶頸</button>
+            <button class="button button-secondary" id="stress-stop" type="button" hidden>停止測試</button>
+            <span class="stress-progress" id="stress-progress" role="status">尚未開始</span>
+          </div>
+          <div class="stress-results" id="stress-results"><p class="stress-placeholder">尚未開始。桌機建議先執行這個測試，比單純看遊戲 FPS 更能觀察 CPU 運算的極限。</p></div>
+          <p class="bench-disclaimer">這裡是 Web Worker 的<strong>純模擬 CPU 耗時</strong>，不是主畫面的實際 FPS。超過 16.67 ms 僅代表單執行緒若每幀執行同量邏輯，會用完 60 FPS 的全部時間預算；實際遊戲還有渲染與其他開銷。測試使用每組 2 次預熱、3 次計時中位數；結果仍受 JIT、GC 與系統負載影響。</p>
         </div>
         <p class="bench-disclaimer">結果因裝置、JIT 最佳化、GC、瀏覽器負載不同而浮動；差距很小時請多跑幾次。這個測試只測 CPU 更新，不代表完整遊戲的整體效能。</p>
       </section>
